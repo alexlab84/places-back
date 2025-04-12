@@ -62,7 +62,8 @@ class LoginView(APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         password = request.data.get('password')
-        
+        print(email)
+        print(password)
         # Buscar al usuario por email
         user = User.objects.filter(email=email).first()
 
@@ -71,7 +72,9 @@ class LoginView(APIView):
             return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         # Si el usuario existe, verificar la contraseña
-        if not user.check_password(password):
+        user = authenticate(username=user.username, password=password)
+
+        if not user:
             return Response({"detail": "Contraseña incorrecta."}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Si el usuario existe y la contraseña es correcta, generar el token JWT
@@ -79,4 +82,7 @@ class LoginView(APIView):
         access_token = str(refresh.access_token)
 
         # Devolver el token de acceso
-        return Response({"access_token": access_token}, status=status.HTTP_200_OK)
+        return Response({
+            "access": access_token,
+            "refresh": str(refresh)  # Esta es la clave que debes usar
+        }, status=status.HTTP_200_OK)

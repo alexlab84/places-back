@@ -44,10 +44,16 @@ class UserLoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
         
-        # Usar el método authenticate para verificar las credenciales
-        user = authenticate(email=email, password=password)
+        
+        try:
+            user_obj = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Credenciales inválidas")
+
+        user = authenticate(username=user_obj.username, password=password)
         if not user:
             raise serializers.ValidationError("Credenciales inválidas")
+
         
         return data
 
