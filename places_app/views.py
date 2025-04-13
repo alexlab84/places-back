@@ -5,7 +5,7 @@ from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from django.contrib.auth.backends import ModelBackend
+from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.tokens import RefreshToken  # Para crear el token JWT
 from .models import Place
 from .serializers import PlacesSerializer, UserRegistrationSerializer
@@ -37,6 +37,19 @@ class PlaceDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Place.objects.all()
     serializer_class = PlacesSerializer
 
+    def get_object(self):
+        """
+        Sobrescribimos el método get_object para asegurar que solo el propietario
+        del lugar pueda acceder, modificar o eliminar su propio lugar.
+        """
+        try:
+            # Filtramos el objeto por el 'pk' en la URL y aseguramos que pertenece al usuario autenticado
+            obj = Place.objects.get(pk=self.kwargs["pk"], user=self.request.user)
+            return obj
+        except Place.DoesNotExist:
+            # Si no se encuentra el lugar o no pertenece al usuario, lanzamos un error 404
+            raise NotFound("Lugar no encontrado o no tienes permiso para acceder a él.")
+
 
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
@@ -55,6 +68,7 @@ class UserRegistrationView(generics.CreateAPIView):
             'access_token': access_token,
             'refresh_token': refresh_token,  
             'user': serializer.data,
+            'user_id': user.id
         }, status=status.HTTP_201_CREATED)
 
 
@@ -86,5 +100,13 @@ class LoginView(APIView):
         
         return Response({
             "access": access_token,
-            "refresh": str(refresh)  
+            "refresh": str(refresh),
+            "user_id": user.id 
         }, status=status.HTTP_200_OK)
+
+class ProtectedView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Aquí ya tienes acceso al usuario autenticado gracias al token
+        return Response({'message': 'Acceso permitido'})
