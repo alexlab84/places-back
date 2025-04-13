@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 
 
 
-# Lista de lugares
+
 class PlacesList(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -40,7 +40,7 @@ class PlaceDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -48,41 +48,43 @@ class UserRegistrationView(generics.CreateAPIView):
         user = serializer.save()
 
         refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
+        access_token = str(refresh.access_token)  
+        refresh_token = str(refresh)
+
         return Response({
             'access_token': access_token,
-            'refresh_token': str(refresh),
+            'refresh_token': refresh_token,  
             'user': serializer.data,
         }, status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
-    permission_classes = [permissions.AllowAny]  # Permitir que cualquier usuario intente hacer login
+    permission_classes = [permissions.AllowAny]  
     
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         password = request.data.get('password')
         print(email)
         print(password)
-        # Buscar al usuario por email
+        
         user = User.objects.filter(email=email).first()
 
-        # Si el usuario no existe, devolver error
+        
         if not user:
             return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Si el usuario existe, verificar la contraseña
+        
         user = authenticate(username=user.username, password=password)
 
         if not user:
             return Response({"detail": "Contraseña incorrecta."}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Si el usuario existe y la contraseña es correcta, generar el token JWT
+        
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
 
-        # Devolver el token de acceso
+        
         return Response({
             "access": access_token,
-            "refresh": str(refresh)  # Esta es la clave que debes usar
+            "refresh": str(refresh)  
         }, status=status.HTTP_200_OK)

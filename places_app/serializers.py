@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from .models import Place
+import re
 
 class PlacesSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source='get_category_display', read_only=True)
@@ -13,25 +14,34 @@ class PlacesSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'location', 'category', 'category_display', 'description', 'user']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    
-
     class Meta:
         model = User
-        fields = ['username', 'email', 'password']  # Incluye todos los campos necesarios
+        fields = ['email', 'password']  
         extra_kwargs = {
-            'password': {'write_only': True}  # Esto asegura que la contraseña no se muestra cuando se consulta
+            'password': {'write_only': True}  
         }
-    
+
     def validate_email(self, value):
+        """Verifica que el email no esté ya registrado"""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Este correo electrónico ya está registrado.")
         return value
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = User.objects.create(**validated_data)  # Creamos el usuario
-        user.set_password(password)  # Encriptamos la contraseña
-        user.save()  # Guardamos el usuario en la base de datos
+        email = validated_data.get('email')
+
+        base_username = re.sub(r'\W+', '', email.split('@')[0])  
+        username = base_username
+        counter = 1
+
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        user = User(username=username, email=email)
+        user.set_password(password)  
+        user.save()  
         return user
     
     
@@ -59,9 +69,7 @@ class UserLoginSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         email = validated_data['email']
-        user = User.objects.get(email=email)  # Obtener el usuario por correo
-
-        # Generación de tokens JWT
+        user = User.objects.get(email=email)  
         refresh = RefreshToken.for_user(user)
         return {
             'access': str(refresh.access_token),
